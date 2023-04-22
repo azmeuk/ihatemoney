@@ -23,6 +23,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    Response,
     send_file,
     send_from_directory,
     session,
@@ -154,7 +155,8 @@ def pull_project(endpoint, values):
 
         is_admin = session.get("is_admin")
         is_invitation = endpoint == "main.join_project"
-        if session.get(project.id) or is_admin or is_invitation:
+        is_feed = endpoint == "main.feed"
+        if session.get(project.id) or is_admin or is_invitation or is_feed:
             # add project into kwargs and call the original function
             g.project = project
         else:
@@ -895,6 +897,23 @@ def statistics():
         monthly_stats=g.project.monthly_stats,
         months=months,
         current_view="statistics",
+    )
+
+
+@main.route("/<project_id>/feed/<string:token>.xml")
+def feed(token):
+    verified_project_id = Project.verify_token(
+        token, token_type="feed", project_id=g.project.id
+    )
+    if verified_project_id != g.project.id:
+        abort(404)
+
+    weighted_bills = g.project.get_bill_weights_ordered().paginate(
+        per_page=100, error_out=True
+    )
+    return Response(
+        render_template("project_feed.xml", bills=weighted_bills),
+        mimetype="application/rss+xml",
     )
 
 

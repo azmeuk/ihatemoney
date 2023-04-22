@@ -1685,6 +1685,97 @@ class BudgetTestCase(IhatemoneyTestCase):
             self.assertIsInstance(session["projects"], dict)
             self.assertIn("raclette", session["projects"])
 
+    def test_rss_feed(self):
+        self.post_project("raclette")
+        self.login("raclette")
+
+        self.client.post("/raclette/members/add", data={"name": "george"})
+        self.client.post("/raclette/members/add", data={"name": "peter"})
+        self.client.post("/raclette/members/add", data={"name": "steven"})
+
+        self.client.post(
+            "/raclette/add",
+            data={
+                "date": "2016-12-31",
+                "what": "fromage à raclette",
+                "payer": 1,
+                "payed_for": [1, 2, 3],
+                "amount": "12",
+                "original_currency": "EUR",
+            },
+        )
+        self.client.post(
+            "/raclette/add",
+            data={
+                "date": "2016-12-30",
+                "what": "charcuterie",
+                "payer": 2,
+                "payed_for": [1, 2],
+                "amount": "15",
+                "original_currency": "EUR",
+            },
+        )
+        self.client.post(
+            "/raclette/add",
+            data={
+                "date": "2016-12-29",
+                "what": "vin blanc",
+                "payer": 2,
+                "payed_for": [1, 2],
+                "amount": "10",
+                "original_currency": "EUR",
+            },
+        )
+
+        project = self.get_project("raclette")
+        token = project.generate_token("feed")
+        resp = self.client.get(f"/raclette/feed/{token}.xml")
+        expected_rss_content = f"""<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	>
+    <channel>
+        <title>raclette</title>
+        <description>A simple shared budget manager web application</description>
+        <atom:link href="http://localhost/raclette/feed/{token}.xml" rel="self" type="application/rss+xml" />
+        <link>http://localhost/raclette/</link>
+        <item>
+            <title>fromage à raclette - €12.00</title>
+            <guid isPermaLink="false">1</guid>
+            <dc:creator>george</dc:creator>
+            <description>December 31, 2016 - george, peter, steven : €4.00</description>
+            <pubDate>Sun, 23 Apr 2023 00:00:00 +0000</pubDate>
+        </item>
+        <item>
+            <title>charcuterie - €15.00</title>
+            <guid isPermaLink="false">2</guid>
+            <dc:creator>peter</dc:creator>
+            <description>December 30, 2016 - george, peter : €7.50</description>
+            <pubDate>Sun, 23 Apr 2023 00:00:00 +0000</pubDate>
+        </item>
+        <item>
+            <title>vin blanc - €10.00</title>
+            <guid isPermaLink="false">3</guid>
+            <dc:creator>peter</dc:creator>
+            <description>December 29, 2016 - george, peter : €5.00</description>
+            <pubDate>Sun, 23 Apr 2023 00:00:00 +0000</pubDate>
+        </item>
+        </channel>
+</rss>"""
+        assert resp.text == expected_rss_content
+
+    def test_rss_feed_bad_token(self):
+        self.post_project("raclette")
+        self.login("raclette")
+        project = self.get_project("raclette")
+        token = project.generate_token("feed")
+
+        resp = self.client.get(f"/raclette/feed/{token}.xml")
+        self.assertEqual(resp.status_code, 200)
+        resp = self.client.get("/raclette/feed/invalid-token.xml")
+        self.assertEqual(resp.status_code, 404)
+
 
 if __name__ == "__main__":
     unittest.main()
