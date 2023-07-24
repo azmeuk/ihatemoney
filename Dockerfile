@@ -56,4 +56,4 @@ RUN echo "**** install build dependencies ****" &&\
 
 VOLUME /database
 EXPOSE ${PORT}
-ENTRYPOINT ["/src/conf/entrypoint.sh"]
+E.NTRYPOINT ["/src/conf/entrypoint.sh"]
